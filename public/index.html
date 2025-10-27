@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Paong - Dashboard Bot</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Socket.IO Client -->
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Custom Styles (di public/css/style.css) -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar (Kiri) -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-sidebar-bg p-4 flex flex-col transition-transform duration-300 transform -translate-x-full md:translate-x-0 md:relative md:shadow-2xl">
+            
+            <div class="text-3xl font-extrabold text-primary-color mb-8 border-b border-gray-700 pb-4">
+                <span class="material-icons mr-2 align-middle text-4xl">cloud_queue</span>
+                Panel Paong
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="space-y-3 flex-grow">
+                <a class="nav-item active" data-view="dashboard" onclick="switchView('dashboard')">
+                    <span class="material-icons mr-3">dashboard</span>
+                    Dashboard
+                </a>
+                <a class="nav-item" data-view="deploy" onclick="switchView('deploy')">
+                    <span class="material-icons mr-3">upload_file</span>
+                    Deploy Bot
+                </a>
+                <a class="nav-item" data-view="files" onclick="switchView('files')">
+                    <span class="material-icons mr-3">folder_open</span>
+                    Manajemen File
+                </a>
+            </nav>
+
+            <!-- Footer Sidebar -->
+            <div class="mt-auto pt-4 border-t border-gray-700 text-center">
+                <p class="text-xs text-gray-400">Stable Build v1.0.0</p>
+                <p class="text-xs text-gray-500">Oleh Paong & Evelyn</p>
+            </div>
+        </aside>
+
+        <!-- Overlay untuk mobile sidebar -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-30 hidden md:hidden" onclick="toggleSidebar()"></div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8">
+            
+            <!-- Header (Hamburger menu for mobile) -->
+            <header class="mb-6 md:mb-8 flex items-center justify-between">
+                <h1 class="text-4xl font-bold text-text-color">
+                    <span id="header-title">Dashboard</span>
+                </h1>
+                <button id="menu-btn" class="text-text-color md:hidden p-2 bg-card-bg rounded-lg shadow-lg" onclick="toggleSidebar()">
+                    <span class="material-icons text-3xl">menu</span>
+                </button>
+            </header>
+
+            <!-- System Monitor Cards (All Views) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+                <!-- CPU Monitor -->
+                <div class="card p-4 flex items-center space-x-4 border-l-4 border-blue-500 hover:scale-[1.02]">
+                    <span class="material-icons text-4xl text-blue-400">memory</span>
+                    <div>
+                        <p class="text-sm text-gray-400 font-medium">CPU Load (1m Avg)</p>
+                        <p id="cpu-usage" class="text-2xl font-bold">--%</p>
+                    </div>
+                </div>
+                <!-- Memory Monitor -->
+                <div class="card p-4 flex items-center space-x-4 border-l-4 border-emerald-500 hover:scale-[1.02]">
+                    <span class="material-icons text-4xl text-emerald-400">storage</span>
+                    <div>
+                        <p class="text-sm text-gray-400 font-medium">Memori Terpakai</p>
+                        <p id="memory-usage" class="text-2xl font-bold">-- GB</p>
+                    </div>
+                </div>
+                <!-- Uptime Status -->
+                <div class="card p-4 flex items-center space-x-4 border-l-4 border-yellow-500 hover:scale-[1.02]">
+                    <span class="material-icons text-4xl text-yellow-400">schedule</span>
+                    <div>
+                        <p class="text-sm text-gray-400 font-medium">Uptime Panel</p>
+                        <p class="text-2xl font-bold text-yellow-400">Online</p>
+                    </div>
+                </div>
+                 <!-- Total Bots -->
+                <div class="card p-4 flex items-center space-x-4 border-l-4 border-indigo-500 hover:scale-[1.02]">
+                    <span class="material-icons text-4xl text-indigo-400">data_array</span>
+                    <div>
+                        <p class="text-sm text-gray-400 font-medium">Total Bot Aktif</p>
+                        <p id="total-bots" class="text-2xl font-bold text-indigo-400">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Views -->
+            <div id="content-views">
+                
+                <!-- 1. Dashboard View -->
+                <section id="view-dashboard" class="view-content">
+                    <div class="card p-6">
+                        <h2 class="text-2xl font-semibold mb-6 border-b border-gray-600 pb-2 flex items-center text-primary-color">
+                            <span class="material-icons mr-3">list_alt</span> Daftar Bot PM2
+                        </h2>
+                        <div id="bot-list" class="space-y-4">
+                            <p class="text-center text-gray-500 p-4" id="loading-msg">Memuat daftar bot...</p>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 2. Deploy Bot View -->
+                <section id="view-deploy" class="view-content hidden">
+                    <div class="card w-full max-w-xl mx-auto p-6">
+                        <h2 class="text-2xl font-semibold mb-6 border-b border-gray-600 pb-2 flex items-center text-teal-400">
+                            <span class="material-icons mr-3">upload_file</span> Formulir Deploy Bot Baru
+                        </h2>
+                        <form id="deploy-form" onsubmit="handleDeploy(event)">
+                            <div class="mb-5">
+                                <label for="zip-file" class="block text-sm font-medium mb-2 text-gray-300">File ZIP Bot (*.zip)</label>
+                                <input type="file" id="zip-file" name="zip-file" accept=".zip" class="w-full text-sm text-gray-300 bg-gray-700 rounded-lg p-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-color/10 file:text-primary-color hover:file:bg-primary-color/20 cursor-pointer" required>
+                            </div>
+                            <div class="mb-5">
+                                <label for="bot-name" class="block text-sm font-medium mb-2 text-gray-300">Nama Bot (PM2 ID)</label>
+                                <input type="text" id="bot-name" name="bot-name" placeholder="misalnya: my-discord-bot" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                            </div>
+                            <div class="mb-5">
+                                <label for="runtime" class="block text-sm font-medium mb-2 text-gray-300">Runtime & Entry File</label>
+                                <select id="runtime" name="runtime" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer" required>
+                                    <option value="node index.js">Node.js (index.js)</option>
+                                    <option value="node main.js">Node.js (main.js)</option>
+                                    <option value="python3 main.py">Python 3 (main.py)</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-end mt-8">
+                                <button type="submit" id="deploy-btn" class="btn bg-teal-600 hover:bg-teal-700 text-white flex items-center shadow-lg hover:shadow-xl transition-all">
+                                    <span class="material-icons mr-2">play_circle_outline</span> Deploy & Start Bot
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+                
+                <!-- 3. File Manager View (Placeholder) -->
+                <section id="view-files" class="view-content hidden">
+                    <div class="card p-6">
+                        <h2 class="text-2xl font-semibold mb-6 border-b border-gray-600 pb-2 flex items-center text-orange-400">
+                            <span class="material-icons mr-3">folder_open</span> Manajemen File
+                        </h2>
+                        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                            <p class="text-gray-400 text-lg text-center">
+                                <span class="material-icons text-6xl text-orange-500 block mb-2">construction</span>
+                                Fitur ini masih dalam tahap pembangunan.
+                            </p>
+                            <p class="text-gray-400 text-center mt-2">Anda dapat mengelola bot melalui Deploy dan Dashboard.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            
+            <!-- Global Message Box (Snackbar) -->
+            <div id="message-box" class="fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white hidden transition-all duration-300 transform translate-y-full z-50"></div>
+            
+        </main>
+    </div>
+
+    <script>
+        // Catatan: Logika JS client-side di-embed di sini untuk kemudahan satu file HTML.
+        
+        const socket = io();
+        const botListEl = document.getElementById('bot-list');
+        const loadingMsg = document.getElementById('loading-msg');
+        const messageBox = document.getElementById('message-box');
+        const headerTitle = document.getElementById('header-title');
+        const totalBotsEl = document.getElementById('total-bots');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const cpuUsageEl = document.getElementById('cpu-usage');
+        const memoryUsageEl = document.getElementById('memory-usage');
+
+        let currentBots = [];
+        let systemCores = 1;
+
+        // --- UI/Navigation Functions ---
+        
+        function toggleSidebar() {
+            sidebar.classList.toggle('mobile-open');
+            sidebarOverlay.classList.toggle('hidden');
+        }
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view-content').forEach(section => {
+                section.classList.add('hidden');
+            });
+
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`.nav-item[data-view="${viewId}"]`).classList.add('active');
+            
+            headerTitle.textContent = viewId.charAt(0).toUpperCase() + viewId.slice(1);
+            
+            if (window.innerWidth < 768) {
+                toggleSidebar();
+            }
+        }
+
+        function showMessage(message, type = 'success') {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden', 'translate-y-full');
+            messageBox.classList.add('translate-y-0');
+
+            let bgColor = 'var(--success-color)';
+            if (type === 'error') bgColor = 'var(--fail-color)';
+            if (type === 'warn') bgColor = 'var(--warn-color)';
+            
+            messageBox.style.backgroundColor = bgColor;
+            
+            setTimeout(() => {
+                messageBox.classList.remove('translate-y-0');
+                messageBox.classList.add('translate-y-full');
+                setTimeout(() => messageBox.classList.add('hidden'), 300); 
+            }, 4000);
+        }
+
+        // --- Server Communication (Deployment) ---
+        async function handleDeploy(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            
+            const deployBtn = document.getElementById('deploy-btn');
+            deployBtn.disabled = true;
+            deployBtn.innerHTML = '<span class="material-icons mr-2 animate-spin">autorenew</span> Processing...';
+            showMessage("Mulai proses deployment, mohon tunggu...", 'warn');
+
+            try {
+                const response = await fetch('/deploy', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage(result.message, 'success');
+                    form.reset();
+                    switchView('dashboard'); 
+                } else {
+                    showMessage('Deployment Gagal: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Terjadi kesalahan jaringan saat deploy.', 'error');
+                console.error('Deploy error:', error);
+            } finally {
+                deployBtn.disabled = false;
+                deployBtn.innerHTML = '<span class="material-icons mr-2">play_circle_outline</span> Deploy & Start Bot';
+            }
+        }
+
+        // --- Server Communication (PM2 Actions) ---
+        function handleBotAction(id, action, buttonEl) {
+            socket.emit('pm2-action', { id, action });
+            
+            buttonEl.disabled = true;
+            const originalText = buttonEl.textContent;
+            buttonEl.innerHTML = '<span class="material-icons text-base animate-spin">autorenew</span> Wait...';
+            
+            setTimeout(() => {
+                buttonEl.disabled = false;
+                buttonEl.textContent = originalText;
+            }, 3000);
+
+            showMessage(`Mengirim perintah '${action.toUpperCase()}' untuk bot ID: ${id}...`, 'warn');
+        }
+
+        // --- Rendering ---
+        function renderBotList(bots) {
+            currentBots = bots;
+            const onlineBots = bots.filter(bot => bot.pm2_env.status === 'online').length;
+            totalBotsEl.textContent = `${onlineBots} / ${bots.length}`;
+
+            if (bots.length === 0) {
+                botListEl.innerHTML = '<p class="text-center text-gray-500 p-4 bg-gray-700 rounded-lg">Belum ada bot yang terdaftar di PM2. Silakan deploy bot baru.</p>';
+                loadingMsg.style.display = 'none';
+                return;
+            }
+            
+            botListEl.innerHTML = bots.map(bot => {
+                const status = bot.pm2_env.status;
+                const statusColor = status === 'online' ? 'bg-emerald-500' : (status === 'stopped' ? 'bg-red-500' : 'bg-yellow-500');
+                const statusText = status.toUpperCase();
+                const uptime = status === 'online' ? new Date(Date.now() - bot.pm2_env.pm_uptime).toISOString().substr(11, 8) : '--';
+                const memory = (bot.monit.memory / 1024 / 1024).toFixed(2) + ' MB';
+                
+                return `
+                    <div class="card flex flex-col md:flex-row justify-between items-center space-y-3 md:space-y-0 md:space-x-4 p-4 border-l-4 border-transparent hover:border-primary-color transition-all duration-200">
+                        <div class="flex-grow w-full md:w-auto">
+                            <p class="text-xl font-bold text-white mb-1">${bot.name}</p>
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-400">
+                                <span class="flex items-center space-x-1">
+                                    <span class="${statusColor} w-3 h-3 rounded-full shadow-lg"></span>
+                                    <span class="font-medium text-white">${statusText}</span>
+                                </span>
+                                <span>| Uptime: ${uptime}</span>
+                                <span>| Memori: ${memory}</span>
+                                <span>| Restarts: ${bot.pm2_env.restart_time}</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2 w-full md:w-auto justify-end flex-shrink-0">
+                            <button onclick="handleBotAction(${bot.pm_id}, 'restart', this)" class="btn bg-yellow-600 hover:bg-yellow-700 text-white text-sm flex items-center">
+                                <span class="material-icons text-base mr-1">refresh</span> Restart
+                            </button>
+                            ${status === 'stopped' ? 
+                                `<button onclick="handleBotAction(${bot.pm_id}, 'start', this)" class="btn bg-green-600 hover:bg-green-700 text-white text-sm flex items-center">
+                                    <span class="material-icons text-base mr-1">play_arrow</span> Start
+                                </button>` :
+                                `<button onclick="handleBotAction(${bot.pm_id}, 'stop', this)" class="btn bg-red-600 hover:bg-red-700 text-white text-sm flex items-center">
+                                    <span class="material-icons text-base mr-1">stop</span> Stop
+                                </button>`
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            loadingMsg.style.display = 'none';
+        }
+
+        // --- Socket.IO Handlers ---
+        socket.on('pm2-list', (bots) => {
+            renderBotList(bots);
+        });
+
+        socket.on('system-monitor', (data) => {
+            systemCores = data.cores || 1; 
+            
+            // CPU: Load Average 1m
+            const cpuLoadAvg = (data.cpuLoadAvg[0] / systemCores) * 100; 
+            cpuUsageEl.textContent = `${cpuLoadAvg.toFixed(1)}%`;
+
+            // Memory: Total dan Terpakai
+            const totalMem = data.totalMem / (1024 * 1024 * 1024); // GB
+            const freeMem = data.freeMem / (1024 * 1024 * 1024); // GB
+            const usedMem = totalMem - freeMem;
+
+            memoryUsageEl.textContent = `${usedMem.toFixed(2)} / ${totalMem.toFixed(2)} GB`;
+        });
+        
+        socket.on('action-result', (result) => {
+            if (result.success) {
+                showMessage(`Aksi '${result.action.toUpperCase()}' untuk bot ID ${result.id} berhasil.`, 'success');
+            } else {
+                showMessage(`Aksi '${result.action.toUpperCase()}' gagal: ${result.error}`, 'error');
+            }
+        });
+
+        // Setup awal saat koneksi terjalin
+        socket.on('connect', () => {
+            socket.emit('get-pm2-list');
+            switchView('dashboard');
+        });
+
+    </script>
+</body>
+</html>
+
